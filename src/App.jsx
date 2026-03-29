@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithRedirect, signOut, getRedirectResult } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
 const COLORS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#8b5cf6"];
@@ -358,9 +358,12 @@ export default function App() {
     return unsub;
   }, []);
 
-  async function handleLogin() {
-    try { await signInWithPopup(auth, googleProvider); }
-    catch (e) { if (e.code !== "auth/popup-closed-by-user") console.error(e); }
+  useEffect(() => {
+    getRedirectResult(auth).catch(() => {});
+  }, []);
+
+  function handleLogin() {
+    signInWithRedirect(auth, googleProvider);
   }
 
   async function handleLogout() {
