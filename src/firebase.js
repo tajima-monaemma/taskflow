@@ -13,3 +13,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Fetch the Google OAuth client ID from Firebase project config
+let _clientIdPromise = null;
+export function getGoogleClientId() {
+  if (!_clientIdPromise) {
+    _clientIdPromise = fetch(
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig?key=${firebaseConfig.apiKey}`
+    )
+      .then(r => r.json())
+      .then(data => {
+        const google = data.idpConfig?.find(p => p.provider === "GOOGLE");
+        return google?.clientId || null;
+      });
+  }
+  return _clientIdPromise;
+}

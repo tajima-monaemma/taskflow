@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { onAuthStateChanged, signInWithCredential, signOut, GoogleAuthProvider } from "firebase/auth";
+import { auth, getGoogleClientId } from "./firebase";
 
 const COLORS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#8b5cf6"];
 const STATUSES = ["Todo","In Progress","Done"];
@@ -349,7 +349,9 @@ function Dashboard({ user, onLogout }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState(null);
 
+  // Listen for Firebase auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -358,17 +360,43 @@ export default function App() {
     return unsub;
   }, []);
 
-  const [loginError, setLoginError] = useState(null);
+  // On page load, check if returning from Google OAuth redirect
+  useEffect(() => {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get("access_token");
+    if (accessToken) {
+      // Clear the URL hash immediately
+      window.history.replaceState(null, "", window.location.pathname);
+      // Sign in to Firebase with the Google access token
+      const credential = GoogleAuthProvider.credential(null, accessToken);
+      signInWithCredential(auth, credential).catch((e) => {
+        console.error("[Auth] credential error:", e);
+        setLoginError(e.message);
+        setAuthLoading(false);
+      });
+    }
+  }, []);
 
+  // Redirect directly to Google OAuth (no iframe, no popup)
   async function handleLogin() {
-    console.log("[Auth] handleLogin called");
     setLoginError(null);
     try {
-      console.log("[Auth] calling signInWithPopup...");
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log("[Auth] success:", result.user.email);
+      const clientId = await getGoogleClientId();
+      if (!clientId) {
+        setLoginError("Google認証が有効になっていません。FirebaseコンソールでGoogle Sign-Inを有効にしてください。");
+        return;
+      }
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: window.location.origin,
+        response_type: "token",
+        scope: "openid email profile",
+        prompt: "select_account",
+      });
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
     } catch (e) {
-      console.error("[Auth] error:", e.code, e.message);
+      console.error("[Auth] login error:", e);
       setLoginError(e.message);
     }
   }
